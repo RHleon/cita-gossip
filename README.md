@@ -1,2 +1,2 @@
 # cita-gossip
-deploy gossip protocol to CITA 
+deploy gossip protocol on CITA 
