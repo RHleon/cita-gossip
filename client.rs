@@ -1,8 +1,5 @@
-////////////////////////////
-/// 'unclear': I am not sure the use of the point or its meaning
-/// 
-/// 
-////////////////////////////
+use std::sync::{Arc, Mutex};
+use std::process;
 
 extern crate mio;
 use mio::tcp::TcpStream;
@@ -10,8 +7,9 @@ use mio::tcp::TcpStream;
 use std::net::SocketAddr;
 use std::str;
 use std::io;
-use std::collections;
 use std::fs;
+use std::collections;
+use std::io::{Read, Write, BufReader};
 
 extern crate env_logger;
 
@@ -20,128 +18,129 @@ extern crate serde_derive;
 extern crate docopt;
 use docopt::Docopt;
 
-extern crate ruslts;
+extern crate rustls;
 extern crate webpki;
 extern crate webpki_roots;
 extern crate ct_logs;
 extern crate vecio;
 
-mod util; //  /util/mode.rs->WriteVAdapter
-use util::WriteVAdapter;  // which glues `rustls::WriteV` trait to `vecio::Rawv`
+mod util;
+use util::WriteVAdapter;
 
 use rustls::Session;
 
 const CLIENT: mio::Token = mio::Token(0);
 
-// Encapsulations of the TCP-level connections, some connection states, and the underlying TLS-level session.
-struct Client {
+/// This encapsulates the TCP-level connection, some connection
+/// state, and the underlying TLS-level session.
+struct TlsClient {
     socket: TcpStream,
     closing: bool,
     clean_closure: bool,
     tls_session: rustls::ClientSession,
-    /*
-    ClientSession's inside: 
-    pub struct ClientSessionImpl {
-    pub config: Arc<ClientConfig>, //保存client端的证书，密钥配置等信息
-    pub secrets: Option<SessionSecrets>, //保存握手后的会话密钥
-    pub alpn_protocol: Option<String>,
-    pub common: SessionCommon, // 完成具体消息传输、加解密等
-    pub error: Option<TLSError>,
-    pub state: Option<Box<hs::State + Send>>, // 保存握手过程中的交互状态，握手中处理对象都实现State接口
-    pub server_cert_chain: CertificatePayload, // 服务端证书链
-    */
 }
 
-impl Client {
+impl TlsClient {
     fn ready(&mut self,
-            poll: &mut mio::Poll,
-            ev: &mio::Event){
-        assert_eq!(ev.token(),CLIENT); //compare the two token
+             poll: &mut mio::Poll,
+             ev: &mio::Event) {
+        assert_eq!(ev.token(), CLIENT);
 
         if ev.readiness().is_readable() {
             self.do_read();
         }
+
         if ev.readiness().is_writable() {
             self.do_write();
         }
-        //the enable of read and write
 
         if self.is_closed() {
             println!("Connection closed");
-            process::exit(if self.clean_closure {0} else {1});
+            process::exit(if self.clean_closure { 0 } else { 1 });
         }
-        //the shut down of the client
 
-        self.reregister(poll);  // unclear
+        self.reregister(poll);
     }
 }
 
-impl io::Write for Client {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {  // u8: The 8-bit unsigned integer type.
+/// We implement `io::Write` and pass through to the TLS session
+impl io::Write for TlsClient {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.tls_session.write(bytes)
     }
+
     fn flush(&mut self) -> io::Result<()> {
         self.tls_session.flush()
     }
-    //implement write and flush to tlsc_session, 
 }
 
-impl io::Read for Client {
+impl io::Read for TlsClient {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
         self.tls_session.read(bytes)
     }
 }
 
-impl Client {
-    fn new(sock: TcpStream, cfg: Arc<rustls::ClientConfig>) -> Client {
-        Client {
+impl TlsClient {
+    fn new(sock: TcpStream, hostname: webpki::DNSNameRef, cfg: Arc<rustls::ClientConfig>) -> TlsClient {
+        TlsClient {
             socket: sock,
             closing: false,
             clean_closure: false,
-            tls_session: rustls::ClientSession::new(&cfg),  // unclear: the parameter in need for new()
+            tls_session: rustls::ClientSession::new(&cfg, hostname),
         }
     }
 
-    fn read_source_to_end(&mut self, rd: &mut io::Read) -> Result<usize> {
+    fn read_source_to_end(&mut self, rd: &mut io::Read) -> io::Result<usize> {
         let mut buf = Vec::new();
         let len = rd.read_to_end(&mut buf)?;
         self.tls_session.write_all(&buf).unwrap();
         Ok(len)
     }
 
+    /// We're ready to do a read.
     fn do_read(&mut self) {
+        // Read TLS data.  This fails if the underlying TCP connection
+        // is broken.
         let rc = self.tls_session.read_tls(&mut self.socket);
         if rc.is_err() {
-            println!("TLS read error:{:?}",rc);
+            println!("TLS read error: {:?}", rc);
             self.closing = true;
             return;
         }
 
-        if rc.unwrap()==0 {
+        // If we're ready but there's no data: EOF.
+        if rc.unwrap() == 0 {
             println!("EOF");
             self.closing = true;
             self.clean_closure = true;
             return;
         }
-
+        // Reading some TLS data might have yielded new TLS
+        // messages to process.  Errors from this indicate
+        // TLS protocol problems and are fatal.
         let processed = self.tls_session.process_new_packets();
         if processed.is_err() {
-            println!("TLS erro: {:?}",processed.unwrap_err());
+            println!("TLS error: {:?}", processed.unwrap_err());
             self.closing = true;
             return;
         }
 
-
-        let mut plaintext = Vec::new(); // the plaintext is what the client received
+        // Having read some TLS data, and processed any new messages,
+        // we might have new plaintext as a result.
+        //
+        // Read it and then write it to stdout.
+        let mut plaintext = Vec::new();
         let rc = self.tls_session.read_to_end(&mut plaintext);
         if !plaintext.is_empty() {
-            io::stdout().write_all(&plaintext).unwrap();  // unclear:where to output? is vec satisfied or not
-            io::stdout().write_all(&plaintext).unwrap();  // unclear:where to output? is vec satisfied or not?
+            io::stdout().write_all(&plaintext).unwrap();
         }
+
+        // If that fails, the peer might have started a clean TLS-level
+        // session closure.
         if rc.is_err() {
             let err = rc.unwrap_err();
             println!("Plaintext read error: {:?}", err);
-            self.clean_closure = err.kind()==io::ErrorKind::ConnectionAborted;
+            self.clean_closure = err.kind() == io::ErrorKind::ConnectionAborted;
             self.closing = true;
             return;
         }
@@ -151,15 +150,15 @@ impl Client {
         self.tls_session.writev_tls(&mut WriteVAdapter::new(&mut self.socket)).unwrap();
     }
 
-    fn register(&self,poll: &mut mio::Poll) {
+    fn register(&self, poll: &mut mio::Poll) {
         poll.register(&self.socket,
-                    CLIENT,
-                    self.ready_interest(),
-                    mio::PollOpt::level() | mio::PollOpt::oneshot())
+                      CLIENT,
+                      self.ready_interest(),
+                      mio::PollOpt::level() | mio::PollOpt::oneshot())
             .unwrap();
     }
 
-    fn reregister(&self,poll: &mut mio::Poll) {
+    fn reregister(&self, poll: &mut mio::Poll) {
         poll.reregister(&self.socket,
                         CLIENT,
                         self.ready_interest(),
@@ -167,9 +166,12 @@ impl Client {
             .unwrap();
     }
 
+    // Use wants_read/wants_write to register for different mio-level
+    // IO readiness events.
     fn ready_interest(&self) -> mio::Ready {
         let rd = self.tls_session.wants_read();
         let wr = self.tls_session.wants_write();
+
         if rd && wr {
             mio::Ready::readable() | mio::Ready::writable()
         } else if wr {
@@ -182,6 +184,196 @@ impl Client {
     fn is_closed(&self) -> bool {
         self.closing
     }
+}
+
+/// This is an example cache for client session data.
+/// It optionally dumps cached data to a file, but otherwise
+/// is just in-memory.
+///
+/// Note that the contents of such a file are extremely sensitive.
+/// Don't write this stuff to disk in production code.
+struct PersistCache {
+    cache: Mutex<collections::HashMap<Vec<u8>, Vec<u8>>>,
+    filename: Option<String>,
+}
+
+impl PersistCache {
+    /// Make a new cache.  If filename is Some, load the cache
+    /// from it and flush changes back to that file.
+    fn new(filename: &Option<String>) -> PersistCache {
+        let cache = PersistCache {
+            cache: Mutex::new(collections::HashMap::new()),
+            filename: filename.clone(),
+        };
+        if cache.filename.is_some() {
+            cache.load();
+        }
+        cache
+    }
+
+    /// If we have a filename, save the cache contents to it.
+    fn save(&self) {
+        use rustls::internal::msgs::codec::Codec;
+        use rustls::internal::msgs::base::PayloadU16;
+
+        if self.filename.is_none() {
+            return;
+        }
+
+        let mut file = fs::File::create(self.filename.as_ref().unwrap())
+            .expect("cannot open cache file");
+
+        for (key, val) in self.cache.lock().unwrap().iter() {
+            let mut item = Vec::new();
+            let key_pl = PayloadU16::new(key.clone());
+            let val_pl = PayloadU16::new(val.clone());
+            key_pl.encode(&mut item);
+            val_pl.encode(&mut item);
+            file.write_all(&item).unwrap();
+        }
+    }
+
+    /// We have a filename, so replace the cache contents from it.
+    fn load(&self) {
+        use rustls::internal::msgs::codec::{Codec, Reader};
+        use rustls::internal::msgs::base::PayloadU16;
+
+        let mut file = match fs::File::open(self.filename.as_ref().unwrap()) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+
+        let mut cache = self.cache.lock()
+            .unwrap();
+        cache.clear();
+        let mut rd = Reader::init(&data);
+
+        while rd.any_left() {
+            let key_pl = PayloadU16::read(&mut rd).unwrap();
+            let val_pl = PayloadU16::read(&mut rd).unwrap();
+            cache.insert(key_pl.0, val_pl.0);
+        }
+    }
+}
+
+impl rustls::StoresClientSessions for PersistCache {
+    /// put: insert into in-memory cache, and perhaps persist to disk.
+    fn put(&self, key: Vec<u8>, value: Vec<u8>) -> bool {
+        self.cache.lock()
+            .unwrap()
+            .insert(key, value);
+        self.save();
+        true
+    }
+
+    /// get: from in-memory cache
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.cache.lock()
+            .unwrap()
+            .get(key).cloned()
+    }
+}
+
+const USAGE: &'static str = "
+Connects to the TLS server at hostname:PORT.  The default PORT
+is 443.  By default, this reads a request from stdin (to EOF)
+before making the connection.  --http replaces this with a
+basic HTTP GET request for /.
+
+If --cafile is not supplied, a built-in set of CA certificates
+are used from the webpki-roots crate.
+
+Usage:
+  tlsclient [options] [--suite SUITE ...] [--proto PROTO ...] <hostname>
+  tlsclient (--version | -v)
+  tlsclient (--help | -h)
+
+Options:
+    -p, --port PORT     Connect to PORT [default: 443].
+    --http              Send a basic HTTP GET request for /.
+    --cafile CAFILE     Read root certificates from CAFILE.
+    --auth-key KEY      Read client authentication key from KEY.
+    --auth-certs CERTS  Read client authentication certificates from CERTS.
+                        CERTS must match up with KEY.
+    --protover VERSION  Disable default TLS version list, and use
+                        VERSION instead.  May be used multiple times.
+    --suite SUITE       Disable default cipher suite list, and use
+                        SUITE instead.  May be used multiple times.
+    --proto PROTOCOL    Send ALPN extension containing PROTOCOL.
+                        May be used multiple times to offer several protocols.
+    --cache CACHE       Save session cache to file CACHE.
+    --no-tickets        Disable session ticket support.
+    --no-sni            Disable server name indication support.
+    --insecure          Disable certificate verification.
+    --verbose           Emit log output.
+    --mtu MTU           Limit outgoing messages to MTU bytes.
+    --version, -v       Show tool version.
+    --help, -h          Show this screen.
+";
+
+#[derive(Debug, Deserialize)]
+struct Args {
+    flag_port: Option<u16>,
+    flag_http: bool,
+    flag_verbose: bool,
+    flag_protover: Vec<String>,
+    flag_suite: Vec<String>,
+    flag_proto: Vec<String>,
+    flag_mtu: Option<usize>,
+    flag_cafile: Option<String>,
+    flag_cache: Option<String>,
+    flag_no_tickets: bool,
+    flag_no_sni: bool,
+    flag_insecure: bool,
+    flag_auth_key: Option<String>,
+    flag_auth_certs: Option<String>,
+    arg_hostname: String,
+}
+
+// TODO: um, well, it turns out that openssl s_client/s_server
+// that we use for testing doesn't do ipv6.  So we can't actually
+// test ipv6 and hence kill this.
+fn lookup_ipv4(host: &str, port: u16) -> SocketAddr {
+    use std::net::ToSocketAddrs;
+
+    let addrs = (host, port).to_socket_addrs().unwrap();
+    for addr in addrs {
+        if let SocketAddr::V4(_) = addr {
+            return addr;
+        }
+    }
+
+    unreachable!("Cannot lookup address");
+}
+
+/// Find a ciphersuite with the given name
+fn find_suite(name: &str) -> Option<&'static rustls::SupportedCipherSuite> {
+    for suite in &rustls::ALL_CIPHERSUITES {
+        let sname = format!("{:?}", suite.suite).to_lowercase();
+
+        if sname == name.to_string().to_lowercase() {
+            return Some(suite);
+        }
+    }
+
+    None
+}
+
+/// Make a vector of ciphersuites named in `suites`
+fn lookup_suites(suites: &[String]) -> Vec<&'static rustls::SupportedCipherSuite> {
+    let mut out = Vec::new();
+
+    for csname in suites {
+        let scs = find_suite(csname);
+        match scs {
+            Some(s) => out.push(s),
+            None => panic!("cannot look up ciphersuite '{}'", csname),
+        }
+    }
+
+    out
 }
 
 /// Make a vector of protocol versions named in `versions`
@@ -199,7 +391,7 @@ fn lookup_versions(versions: &[String]) -> Vec<rustls::ProtocolVersion> {
 
     out
 }
-
+/// here load cert from local cert file, using rustls way
 fn load_certs(filename: &str) -> Vec<rustls::Certificate> {
     let certfile = fs::File::open(filename).expect("cannot open certificate file");
     let mut reader = BufReader::new(certfile);
@@ -222,25 +414,6 @@ fn load_key_and_cert(config: &mut rustls::ClientConfig, keyfile: &str, certsfile
     config.set_single_client_cert(certs, privkey);
 }
 
-#[derive(Debug, Deserialize)]
-struct Args {
-    flag_port: Option<u16>,
-    flag_http: bool,
-    flag_verbose: bool,
-    flag_protover: Vec<String>,
-    flag_suite: Vec<String>,
-    flag_proto: Vec<String>,
-    flag_mtu: Option<usize>,
-    flag_cafile: Option<String>,
-    flag_cache: Option<String>,
-    flag_no_tickets: bool,
-    flag_no_sni: bool,
-    flag_insecure: bool,
-    flag_auth_key: Option<String>,
-    flag_auth_certs: Option<String>,
-    arg_hostname: String,
-}
-
 #[cfg(feature = "dangerous_configuration")]
 mod danger {
     use super::rustls;
@@ -260,6 +433,25 @@ mod danger {
 }
 
 #[cfg(feature = "dangerous_configuration")]
+/* Arg
+    struct Args {
+        flag_port: Option<u16>,
+        flag_http: bool,
+        flag_verbose: bool,
+        flag_protover: Vec<String>,
+        flag_suite: Vec<String>,
+        flag_proto: Vec<String>,
+        flag_mtu: Option<usize>,
+        flag_cafile: Option<String>,
+        flag_cache: Option<String>,
+        flag_no_tickets: bool,
+        flag_no_sni: bool,
+        flag_insecure: bool,
+        flag_auth_key: Option<String>,
+        flag_auth_certs: Option<String>,
+        arg_hostname: String,
+    }
+*/
 fn apply_dangerous_options(args: &Args, cfg: &mut rustls::ClientConfig) {
     if args.flag_insecure {
         cfg
@@ -275,9 +467,7 @@ fn apply_dangerous_options(args: &Args, _: &mut rustls::ClientConfig) {
     }
 }
 
-
 /// Build a `ClientConfig` from our arguments
-/// unclear: how it works
 fn make_config(args: &Args) -> Arc<rustls::ClientConfig> {
     let mut config = rustls::ClientConfig::new();
     config.key_log = Arc::new(rustls::KeyLogFile::new());
