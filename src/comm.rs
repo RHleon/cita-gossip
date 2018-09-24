@@ -78,7 +78,7 @@ impl comm {
 
         let sock = TcpStream::connect(&des_ip).unwrap();
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&args.arg_hostname).unwrap();
-        let mut tlsclient = Client::new(sock, dns_name, config);
+        let mut tlsclient = TlsClient::new(sock, dns_name, config);
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
@@ -119,7 +119,7 @@ impl comm {
 
         let sock = TcpStream::connect(&des_ip).unwrap();
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&args.arg_hostname).unwrap();
-        let mut tlsclient = Client::new(sock, dns_name, config);
+        let mut tlsclient = TlsClient::new(sock, dns_name, config);
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
@@ -161,7 +161,7 @@ impl comm {
 
         let sock = TcpStream::connect(&des_ip).unwrap();
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(&args.arg_hostname).unwrap();
-        let mut tlsclient = Client::new(sock, dns_name, config);
+        let mut tlsclient = TlsClient::new(sock, dns_name, config);
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
@@ -220,7 +220,7 @@ impl comm{
             ServerMode::Forward(args.arg_fport.expect("fport required"))
         };
 
-        let mut tlsserv = Server::new(listener, mode, config);
+        let mut tlsserv = TlsServer::new(listener, mode, config);
 
         let mut events = mio::Events::with_capacity(256);
         loop {

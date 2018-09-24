@@ -2,9 +2,10 @@
 use::discovery::NetworkMember;
 use::storage::Node;
 
-pub struct Empty_msg{
+pub struct Short_msg{
     src:NetworkMember,
     des:NetworkMember,
+    data:String,
     flag:bool,
 }
 pub struct List_msg{
@@ -24,11 +25,12 @@ pub struct HeartBeat_msg{
     is_alive:bool,
 }
 
-impl Empty_msg{
+impl Short_msg{
     pub fn new(self_node:NetworkMember/*the local NetworkMember*/) -> Self{
-        Empty_msg{
+        Short_msg{
             src : self_node,
             des : self_node,
+            data: String::from(""),
             flag: false,
         }
     }
@@ -36,17 +38,17 @@ impl Empty_msg{
         self.des = target;
         self.flag = false;
         des_ip = super::filter::filter(target);
-        super::comm::EmptySend();    //Unfinished
+        super::comm::ShortSend();    //Unfinished
     }
     pub fn receive(&self){
         if self.flag == false {
-            let rec_emp_msg = Empty_msg{
+            let rec_emp_msg = Short_msg{
                 src : self.des,
                 des : self.src,
                 flag : true,
             };
             des_ip = super::filter::filter(rec_emp_msg.des);
-            super::comm::EmptySend();    //Unfinished
+            super::comm::ShortSend();    //Unfinished
         }
     }
 }
