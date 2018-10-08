@@ -40,7 +40,7 @@ impl comm {
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
-        tlsclient.read_source_to_end().unwrap();//unclear
+        tlsclient.read_source_to_end(b"gossip emptysend").unwrap();//unclear
 
 
         let mut poll = mio::Poll::new()
@@ -82,7 +82,7 @@ impl comm {
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
-        tlsclient.read_source_to_end(list).unwrap();//unclear
+        tlsclient.read_source_to_end(b"gossip list"+list).unwrap();//unclear
 
 
         let mut poll = mio::Poll::new()
@@ -123,7 +123,7 @@ impl comm {
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
-        tlsclient.read_source_to_end(Data).unwrap();//unclear
+        tlsclient.read_source_to_end(b"gossip data"+Data).unwrap();//unclear
 
 
         let mut poll = mio::Poll::new()
@@ -165,7 +165,7 @@ impl comm {
 
         //here do writing to the stream
         //let mut stdin = io::stdin();
-        tlsclient.read_source_to_end(is_alive).unwrap();//unclear
+        tlsclient.read_source_to_end(b"gossip live"+is_alive).unwrap();//unclear
 
 
         let mut poll = mio::Poll::new()
@@ -222,7 +222,7 @@ impl comm{
 
         let mut tlsserv = TlsServer::new(listener, mode, config);
 
-        let mut events = mio::Events::with_capacity(256);
+        let mut events = mio::Events::with_capacity(256); // create storage for events
         loop {
             poll.poll(&mut events, None)
                 .unwrap();
@@ -232,7 +232,7 @@ impl comm{
                     LISTENER => {
                         if !tlsserv.accept(&mut poll) {
                             break;
-                        }
+                        } //tlsserv.accept returns a bool var
                     }
                     _ => tlsserv.conn_event(&mut poll, &event)
                 }
