@@ -14,6 +14,8 @@ extern crate serde_derive;
 extern crate toml;
 extern crate serde;
 extern crate serde_json;
+extern crate env_logger;
+extern crate mdns;
 
 use std::path::Path;
 use std::fs::File;
@@ -97,3 +99,20 @@ pub fn Send(){
 		des = filter::random_filter();
 		find_msg.send(des, true);
 }       //send to filter in order to gossip alive
+
+
+pub fn mdns(){
+	env_logger::init();
+
+    let responder = mdns::Responder::new().unwrap();
+    let _svc = responder.register(
+        "_http._tcp".to_owned(),
+        "Web Server".to_owned(),
+        80,
+        &["path=/"],
+    );
+
+    loop {
+        ::std::thread::sleep(::std::time::Duration::from_secs(10));
+    }
+}

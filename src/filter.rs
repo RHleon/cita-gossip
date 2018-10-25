@@ -35,7 +35,7 @@ pub fn Spread(){
 	//账本更新
 	//获取账本时间-String
 	let random_des = filter::random_filter();
-	let version_msg = msg::Short_msg.new();
+	let version_msg = msg::Short_msg::new();
 	version_msg.send(random_des，Data/*Data为账本时间*/);
 }//此为随机发送，单播另设函数
 //接收并散布cita想要发布的消息（账本）
@@ -43,7 +43,7 @@ pub fn Spread(){
 pub fn Gossip_Send(des:Node){
 	//账本更新
 	//获取账本时间-String
-	let version_msg = msg::Short_msg.new();
+	let version_msg = msg::Short_msg::new();
 	version_msg.send(des，Data/*Data为账本时间*/);
 }
 
@@ -54,11 +54,21 @@ pub fn Gossip(){
     周期性发送Alive消息（维护集群），
     账本更新触发Gossip消息处理，
     */
-}
+   let interval = Duration::milliseconds(1000);
+    let mut timer = Timer:new().unwrap();
+    let oneshot: Receiver<()> = timer.oneshot(interval);
 
-pub fn Hear(){
-	/*对账本时间进行对比，再进行操作
-	若本地较新，不予处理；若本地较旧，实例化Gossip消息并发送。更新本地账本。
+    oneshot.recv();
+
+    timer::sleep(interval);
+
+    let metronome: Receiver<()> = timer.periodic(interval);
+
+    for i in iter::range_step(5i, 0, -1) {
+        metronome.recv();
+        let alive_msg = msg::List_msg::new();
+        let op = random_filter();
+        alive_msg.send(op,ture);
+    }
+    metronome.recv();
 }
-//听闻接收到的消息（账本）
-//类似监听的server

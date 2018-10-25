@@ -38,7 +38,7 @@ impl Short_msg{
         self.des = target;
         self.flag = false;
         des_ip = super::filter::filter(target);
-        super::comm::ShortSend();    //Unfinished
+        super::comm::ShortSend();    
     }
     pub fn receive(&self){
         if self.flag == false {
@@ -48,7 +48,7 @@ impl Short_msg{
                 flag : true,
             };
             des_ip = super::filter::filter(rec_emp_msg.des);
-            super::comm::ShortSend();    //Unfinished
+            super::comm::ShortSend();    
         }
     }
 }
@@ -108,7 +108,3 @@ impl HeartBeat_msg{
         //change local file through is_alive
     }
 }
-
-
-
-//短消息问题：在此处设置消息还是comm？
