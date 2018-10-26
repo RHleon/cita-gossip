@@ -5,16 +5,22 @@ A project which use Gossip protocol with a modern TLS library. Intending to acco
 The language [*rust*](https://www.rust-lang.org/zh-CN/) is used.
 
 ---
-##Overview
-###`Project intro
+
+#Overview
+
+##`Project intro
+
  - Gossip协议在异步系统中被广泛应用于消息的同步和处理。其在网络资源占用和性能上的表现较为均衡，能够很好的满足P2P网络结构下的网络消息散播、状态同步。
  - 本项目旨在利用Gossip的消息同步方式，基于TCP+TLS完善的底层通信，实现集群状态的同步，同时实现对更上层CITA应用的网络传输接口。
  - 设计并引入节点发现协议, 动态发现周围节点。
 
-###`Project structure
+##`Project structure
+
 The project is constructed with several mods. Each of them holds a part of the function of gossip.
+
 A sketch map:
 //recommand: add a sketch map here, link to a png 
+
 Introduction:
 * comm: 
     - Transfer module with TCP+TLS, involves [*rustls*](https://github.com/ctz/rustls)
@@ -32,6 +38,7 @@ Introduction:
     - operations of the stored list file. The list records the status of the cluster, mainly focus on those who is alive.
 
 ---
+
 ##Status
 The design is complete.Small adjustments are being considered.
 We have built up the whole structure of the project. 
