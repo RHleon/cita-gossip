@@ -523,8 +523,6 @@ fn load_ocsp(filename: &Option<String>) -> Vec<u8> {
     ret
 }
 
-// return the Arc which is used to new the tlsserver,which shows the acknowledgement
-// command line need to show the cert and the key
 fn make_config(args: &Args) -> Arc<rustls::ServerConfig> {
     let client_auth = if args.flag_auth.is_some() {
         let roots = load_certs(args.flag_auth.as_ref().unwrap());
@@ -571,11 +569,9 @@ fn make_config(args: &Args) -> Arc<rustls::ServerConfig> {
     Arc::new(config)
 }
 
-// using command line to run the server at first, this server who run and listen to the fixed port, receiving traffic, message parsing(which need to be down) and trigger event in msg module
 fn main() {
     let version = env!("CARGO_PKG_NAME").to_string() + ", version: " + env!("CARGO_PKG_VERSION");
 
-    //parsing the command line
     let args: Args = Docopt::new(USAGE)
         .and_then(|d| Ok(d.help(true)))
         .and_then(|d| Ok(d.version(Some(version))))
@@ -590,7 +586,6 @@ fn main() {
 
     let mut addr: net::SocketAddr = "0.0.0.0:8443".parse().unwrap();
     addr.set_port(args.flag_port.unwrap_or(8443));
-    //use 8443 as test, still could be adjusted
 
     let config = make_config(&args);
 
@@ -603,8 +598,6 @@ fn main() {
                   mio::PollOpt::level())
         .unwrap();
 
-    // echo mode and http mode could be used as tests
-    // http mode could be adjusted to receive traffic, removing the http header
     let mode = if args.cmd_echo {
         ServerMode::Echo
     } else if args.cmd_http {
@@ -614,11 +607,10 @@ fn main() {
     };
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-    //here we need to add some functions to connect module msg
-    //the former handle message function which used to do message parsing is under mistakes,so start new
-    // in need of guidance
 
     let mut events = mio::Events::with_capacity(1024);
+
+
     loop {
         poll.poll(&mut events, None)
             .unwrap();

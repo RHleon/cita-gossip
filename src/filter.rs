@@ -1,11 +1,20 @@
+//The module adjusts the sending object and controls the periodic sending function.
+//
+//
+//Responsible for cluster maintenance
+//
+//
+//
 
-use::storage::Node;
 use::msg;
-//filter模块的功能是确定发送目标的id
 use::storage::Node;
 use::storage;
 use rand::Rng;
+use std::time::Duration;
+use std::thread;
 
+
+//this function is used for generating random target nodes.
 pub fn random_filter() -> Node{
     let list : Vec<Node> = storage::get_list();
     let mut len:u32 = 0;
@@ -16,9 +25,11 @@ pub fn random_filter() -> Node{
     //if  { }   need to know the local node.
     let random_target = list.get(random_number)
 }
-pub fn filter(target:NetworkMember/*发送目标*/) -> iptype{
+
+//this function is used for converting nodes to IP.
+pub fn filter(target:Node) -> iptype{
     let list : Vec<Node> = storage::get_list();
-    let des_id = NetworkMember.Id;
+    let des_id = Node.Id;
     let mut flag:bool = false;
     for item in list{
         if item.id == des_id{
@@ -31,44 +42,34 @@ pub fn filter(target:NetworkMember/*发送目标*/) -> iptype{
     }
     return ip
 }
-pub fn Spread(){
-	//账本更新
-	//获取账本时间-String
-	let random_des = filter::random_filter();
-	let version_msg = msg::Short_msg::new();
-	version_msg.send(random_des，Data/*Data为账本时间*/);
-}//此为随机发送，单播另设函数
-//接收并散布cita想要发布的消息（账本）
 
-pub fn Gossip_Send(des:Node){
-	//账本更新
-	//获取账本时间-String
-	let version_msg = msg::Short_msg::new();
-	version_msg.send(des，Data/*Data为账本时间*/);
+//this function is used for random transmission.
+pub fn Spread(){
+	//Book update
+	//Getting account book time-String
+	let random_des = filter::random_filter();
+	let version_msg = msg::Gossip_msg::new();
+	version_msg.send(random_des，Data/*Data is book*/);
 }
 
-pub fn Gossip(){
-    //控制Gossip过程
-    /*
-    启动监听，
-    周期性发送Alive消息（维护集群），
-    账本更新触发Gossip消息处理，
-    */
-   let interval = Duration::milliseconds(1000);
-    let mut timer = Timer:new().unwrap();
-    let oneshot: Receiver<()> = timer.oneshot(interval);
+//this function is used for unicast.
+pub fn Gossip_Send(des:Node){
+	//Book update
+	//Getting account book time-String
+	let version_msg = msg::Short_msg::new();
+	version_msg.send(des，Data/*Data is book*/);
+}
 
-    oneshot.recv();
-
-    timer::sleep(interval);
-
-    let metronome: Receiver<()> = timer.periodic(interval);
-
-    for i in iter::range_step(5i, 0, -1) {
-        metronome.recv();
+//this function is used for cluster_maintenance
+//by transmiting periodically.
+pub fn Cluster_Maintenance(){
+   for i in 0..3 {
+	
+	thread::spawn(move || {
         let alive_msg = msg::List_msg::new();
         let op = random_filter();
         alive_msg.send(op,ture);
-    }
-    metronome.recv();
+    });
+    thread::sleep(Duration::from_secs(1));
+}
 }

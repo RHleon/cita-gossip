@@ -1,7 +1,11 @@
-//discovery模块接口
-//extern
-
-//全局变量
+//The module is responsible for self discovery function.
+//
+//Responsible for communicating with configuration files.
+//
+//calling mDNS module to use mDNS function.
+//
+//
+//
 
 use::storage::Node;
 use::msg::List_msg;
@@ -23,6 +27,8 @@ use std::io::prelude::*;
 use rand::Rng;
 
 #[derive(Serialize, Deserialize, Debug)]
+
+//this structure is used for configuration
 pub struct Seed_Node {
     Id: String,
     Ip: String,
@@ -38,7 +44,7 @@ impl Seed_Node {
     }
 }
 
-
+// this function get a filename, return a vector of Seed_Nodes from the file.
 pub fn get_conli() -> Vec<Seed_Node> {
 
     let filename = "configuration.toml";
@@ -60,6 +66,7 @@ pub fn get_conli() -> Vec<Seed_Node> {
     nodes
 }
 /*
+// this function get a vector of Seed_Nodes and a filename, write this vector into the file.
 pub fn write_conli(v: Vec<Seed_Node>) {
 
     let filename = "configuration.toml";
@@ -78,6 +85,8 @@ pub fn write_conli(v: Vec<Seed_Node>) {
     }
 }*/
 
+//this function gets Seed_Node from configuration file 
+//and transmits messages to others to change AliveList. 
 pub fn ApplyBySeed(){
 	let configuration_list: Vec<Seed_Node> = get_conli();
 	let mut len:u32 = 0;
@@ -92,15 +101,17 @@ pub fn ApplyBySeed(){
     alive_add.send(random_target,true);
     listrequest_add.send(random_target,true);
 
-}     //get seed from configuration file
+}     
+
+//this function sends List_msg to change AliveList. 
 pub fn Send(){
 		let find_msg = msg::List_msg::new(GetSelfNode());
-		let des = Node::new();   //new()fn
+		let des = Node::new();   
 		des = filter::random_filter();
 		find_msg.send(des, true);
-}       //send to filter in order to gossip alive
+} 
 
-
+// this function calls mDNS module.
 pub fn mdns(){
 	env_logger::init();
 
