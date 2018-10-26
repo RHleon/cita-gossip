@@ -456,64 +456,34 @@ fn make_config() -> Arc<rustls::ClientConfig> {
 
     //let cafile = args.flag_cafile.as_ref().unwrap();// this is the parsing way, the fixed approach can be adjusted
 
-    let cafile = "test-ca/rsa/ca.cert";//the fixed approach
+    let cafile = "test-ca/rsa/ca.cert";//we fix the path of the cert
 
     let certfile = fs::File::open(&cafile).expect("Cannot open CA file");
     let mut reader = BufReader::new(certfile);
     config.root_store
         .add_pem_file(&mut reader)
         .unwrap();
-
-    //let persist = Arc::new(PersistCache::new(&args.flag_cache));
-
-    //config.set_protocols(&args.flag_proto);
-    //config.set_persistence(persist);
-    //config.set_mtu(&args.flag_mtu);
-
-    apply_dangerous_options(args, &mut config);
-
-    // if args.flag_auth_key.is_some() || args.flag_auth_certs.is_some() {
-    //     load_key_and_cert(&mut config,
-    //                       args.flag_auth_key
-    //                           .as_ref()
-    //                           .expect("must provide --auth-key with --auth-certs"),
-    //                       args.flag_auth_certs
-    //                           .as_ref()
-    //                           .expect("must provide --auth-certs with --auth-key"));
-    // }
-
+    
+    apply_dangerous_options(args, &mut config);  // the function that apply impl dangerous
     Arc::new(config)
 }
 
 /// Parse some arguments, then make a TLS client connection
 /// somewhere.
 fn send(hostname:&string, ip:&string, port:&string, data:&string ) {
-    // let version = env!("CARGO_PKG_NAME").to_string() + ", version: " + env!("CARGO_PKG_VERSION");
 
-    // let args: Args = Docopt::new(USAGE)
-    //     .and_then(|d| Ok(d.help(true)))
-    //     .and_then(|d| Ok(d.version(Some(version))))
-    //     .and_then(|d| d.deserialize())
-    //     .unwrap_or_else(|e| e.exit());
-
-    // if args.flag_verbose {
-    //     env_logger::Builder::new()
-    //         .parse("trace")
-    //         .init();
-    // }
-
-    let port = port.unwrap_or(443);
+    let port = port.unwrap_or(443);  // port could be change as the para port if given
     let addr = ip;
 
-    let config = make_config();
+    let config = make_config();  // no need to input para 
 
     let sock = TcpStream::connect(&addr).unwrap();
     let dns_name = webpki::DNSNameRef::try_from_ascii_str(&hostname).unwrap();
     let mut tlsclient = TlsClient::new(sock, dns_name, config);
 
     tlsclient.read_source_to_end(&data).unwrap();
-    //println!("tlsclient.read_source_to_end");
-
+    
+    //here new a eventpoll,register the event with tlsclient
     let mut poll = mio::Poll::new()
         .unwrap();
     let mut events = mio::Events::with_capacity(32);
@@ -522,11 +492,9 @@ fn send(hostname:&string, ip:&string, port:&string, data:&string ) {
     loop {
         poll.poll(&mut events, None)
             .unwrap();
-        // println!("poll:{:?}",poll);
 
         for ev in events.iter() {
             tlsclient.ready(&mut poll, &ev);
-            // println!("eventloop");
         }
     }
 }
