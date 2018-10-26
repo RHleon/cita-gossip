@@ -67,7 +67,6 @@ It's currently in development and hence unstable.
 ## Instructions and Approaches
 Here introduces how to use and run this project. Due to some functions and modules are under developing, it may not work well for the moment.
  - You have to get a complete set of certifications, public and private keys to run module comm. The shell script in /test-ca helps you get one that could be used to verify the function of comm.
- - 
 
 ---
 ## Reference
