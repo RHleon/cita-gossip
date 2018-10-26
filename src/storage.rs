@@ -1,3 +1,10 @@
+//This module is responsible for static file processing.
+//
+//
+//Declares rules for modifying local data and provides data interfaces.
+//
+//
+//mainly relating to self discovery function and cluster maintenance.
 #[macro_use]
 extern crate serde_derive;
 
@@ -112,26 +119,4 @@ pub fn dead_deal(v: Node) {
         Ok(s) => s,
         Err(e) => panic!("couldn't write {}, exception: {}", path.display(), e)
     }
-}
-
-//testing codes
-fn main() {
-// //test function write_list() 
-//     let mut nodes_test: Vec<Node> = Vec::new();
-//     let node1 = Node::new("1", "101.11.14.202", "2018917");
-//     nodes_test.push(node1);
-//     let node2 = Node::new("2", "101.121.24.105", "20180907");
-//     nodes_test.push(node2);
-//     write_list(nodes_test, "data.toml");
-
-// //test function get_list()
-//     let nodelist: Vec<Node> = get_list("data.toml");
-//     for item in nodelist {
-//         println!("{:?}", item);
-//     }
-
-// //test function dead_deal
-//     let node1 = Node::new("1", "101.11.14.202", "2018917");
-//     dead_deal(node1, "data.toml");
-
 }
