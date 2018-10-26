@@ -56,7 +56,7 @@ It's currently in development and hence unstable.
  - New nodes can join in the cluster.
  - Acknowledge and encrypted data transfer between nodes.
  - Random send which is the push method of gossip.
- - 
+ 
 ### Possible Features
 
  - Unicast in application layer
