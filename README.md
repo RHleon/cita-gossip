@@ -18,7 +18,7 @@ The project is constructed with several mods. Each of them holds a part of the f
 
 A sketch map:
 
-//recommand: add a sketch map here, link to a png 
+![logo](https://github.com/EricGz/cita-gossip/blob/master/docs/module%20design.png) 
 
 Introduction:
 * comm: 
