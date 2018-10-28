@@ -1,4 +1,4 @@
-# CITA-Gossip
+﻿# CITA-Gossip
 
 A project which use Gossip protocol with a modern TLS library. Intending to accomplish synchronization in clusters and serves Data transfer related to Block Chain. Cooperation with CITA developed by Cryptape.
 
@@ -6,7 +6,7 @@ The language [*rust*](https://www.rust-lang.org/zh-CN/) is used.
 
 ---
 ##Overview
-###`Project intro
+###Project intro
  - Gossip协议在异步系统中被广泛应用于消息的同步和处理。其在网络资源占用和性能上的表现较为均衡，能够很好的满足P2P网络结构下的网络消息散播、状态同步。
  - 本项目旨在利用Gossip的消息同步方式，基于TCP+TLS完善的底层通信，实现集群状态的同步，同时实现对更上层CITA应用的网络传输接口。
  - 设计并引入节点发现协议, 动态发现周围节点。
